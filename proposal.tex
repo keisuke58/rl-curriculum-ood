@@ -1,0 +1,102 @@
+% This is a variation of the NeurIPS'24 format
+\documentclass{article}
+\usepackage[final]{adrl}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\title{Curriculum Ordering and Out-of-Distribution Generalization\\
+in Proximal Policy Optimization}
+
+\author{Keisuke Nishioka \\ \url{github.com/keisuke58/rl-curriculum-ood}}
+
+\begin{document}
+
+\maketitle
+
+\noindent\textbf{Team:} Single-student project (Keisuke Nishioka, solo).
+
+\section{Motivation}
+
+Curriculum learning---ordering training from easy to hard---is widely believed to improve convergence in reinforcement learning, yet existing work almost exclusively evaluates on the \emph{same} environments used for training.
+Whether a carefully ordered curriculum also helps an agent \emph{generalize} to novel, unseen environments is an open question with practical importance: a robot or autonomous agent must ultimately act outside its training distribution.
+This project asks whether curriculum ordering affects out-of-distribution (OOD) generalization in MiniGrid, and whether the curriculum condition that maximizes training-environment performance is the same one that maximizes transfer.
+If the two objectives conflict, this reveals a concrete curriculum-design trade-off not previously characterized in the deep RL generalization literature.
+
+\section{Related Topics}
+
+\paragraph{Curriculum Learning (Bengio et al., 2009).}
+The foundational paper proposes ordering training examples from easy to hard to accelerate learning. We test whether this principle holds for \emph{generalization} as well as convergence speed in the RL setting.
+
+\paragraph{Generalization in Deep RL (Kirk et al., 2023 --- Week 11).}
+The survey identifies generalization to unseen environments as a central open problem. We adopt their zero-shot OOD evaluation protocol and use MiniGrid's procedural structure to create held-out test environments.
+
+\paragraph{Proximal Policy Optimization (Schulman et al., 2017 --- Weeks 5--6).}
+PPO is the baseline algorithm throughout. Its clipped surrogate objective and on-policy nature make it a standard choice for MiniGrid-scale experiments and a direct extension of the lecture example.
+
+\section{Idea}
+
+We train a PPO agent under five curriculum conditions that differ only in the \emph{ordering} of three MiniGrid environments (Easy $\to$ Medium $\to$ Hard, Reverse, Random, Hard-only, Mixed multi-task).
+After training, every agent is evaluated zero-shot on two held-out environments it has never seen.
+The key quantity is the \emph{generalization gap}: does the condition with the highest training return also achieve the highest OOD success rate, or does curriculum-induced overfitting to the training distribution hurt transfer?
+
+\begin{algorithm}[H]
+    \caption{Threshold-based curriculum switching for Progressive and Reverse conditions.}
+    \label{alg:curriculum}
+    \begin{algorithmic}
+        \REQUIRE ordered environment list $[e_1, e_2, e_3]$, threshold $\tau = 0.70$, window $W = 20$
+        \STATE $i \leftarrow 1$, $\text{successes} \leftarrow []$
+        \WHILE{steps $< 10^6$}
+            \STATE Collect episode in $e_i$ with PPO; append outcome to \texttt{successes}
+            \IF{$\text{mean}(\text{last } W \text{ of successes}) \geq \tau$ \AND $i < 3$}
+                \STATE $i \leftarrow i + 1$ \COMMENT{advance to next environment}
+            \ENDIF
+        \ENDWHILE
+        \RETURN policy $\pi_\theta$
+    \end{algorithmic}
+\end{algorithm}
+
+The OOD evaluation metric is defined as:
+\begin{equation}
+    \label{eq:ood}
+    \text{OOD-SR}(\pi) = \frac{1}{|E_\text{test}|} \sum_{e \in E_\text{test}}
+    \frac{1}{50} \sum_{k=1}^{50} \mathbf{1}[R_k(e) > 0]
+\end{equation}
+where $E_\text{test} = \{\texttt{DoorKey-5x5}, \texttt{MultiRoom-N2-S4}\}$ and $R_k(e)$ is the terminal reward of episode $k$.
+
+\section{Experiments}
+
+\paragraph{Environments \& Metrics}
+Three MiniGrid environments form the training set (\texttt{Empty-8x8}, \texttt{FourRooms}, \texttt{KeyCorridorS3R1}, ordered easy to hard); two structurally distinct environments (\texttt{DoorKey-5x5}, \texttt{MultiRoom-N2-S4}) are held out for zero-shot evaluation only.
+We measure (1) mean in-distribution return over the last $10^5$ training steps, (2) OOD success rate (Eq.~\ref{eq:ood}), and (3) area under the learning curve as a sample-efficiency proxy.
+Statistical significance between conditions uses Kruskal--Wallis followed by pairwise Mann--Whitney $U$ tests with Bonferroni correction ($\alpha = 0.05$).
+
+\paragraph{Experimental Scope}
+Five curriculum conditions $\times$ 10 seeds $= 50$ main runs, each for $10^6$ environment steps.
+Two ablations on curriculum switching threshold (60\% vs.\ 80\% success rate) add 20 runs.
+Total: \textbf{70 runs}, all with identical PPO hyperparameters (lr $= 3\times10^{-4}$, $n_\text{steps}=1024$, $\gamma=0.99$, GAE $\lambda=0.95$, clip $\epsilon=0.2$, entropy coeff.\ $= 0.01$).
+
+\paragraph{Estimated Computational Load}
+One run takes approximately 25--30 minutes on a single CPU core for \texttt{MiniGrid-FourRooms} at $10^6$ steps.
+With 10 parallel processes on the available cluster (4$\times$RTX 4090 servers), all 70 runs complete in roughly 4--5 hours wall-clock time.
+Memory footprint per process is under 2 GB; no GPU is required for MiniGrid (CPU-bound simulation).
+Analysis scripts (\texttt{analysis/}) run in under 5 minutes on any laptop.
+
+\section{Timeline}
+
+\begin{itemize}
+    \item \textbf{Research}: literature review and hypothesis formulation --- complete
+    \item \textbf{Implementation}: PPO training loop, curriculum switching, OOD evaluation scripts --- complete (\texttt{train.py}, \texttt{curriculum.py}, \texttt{evaluate.py})
+    \item \textbf{Experiments}: 70 distributed runs on cluster --- 2026-07-01 to 07-07
+    \item \textbf{Analysis}: result aggregation, statistical tests, figures --- 2026-07-08 to 07-12
+    \item \textbf{Reporting}: Report ($\leq$4 pages, NeurIPS-style \texttt{adrl} format) + Poster (PDF) --- 2026-07-15 to 08-20; submission 2026-08-23 via Stud.IP
+\end{itemize}
+
+\end{document}
