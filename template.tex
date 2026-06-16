@@ -1,0 +1,70 @@
+% This is a variation of the NeurIPS'24 format
+\documentclass{article}
+\usepackage[final]{adrl}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}     
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Add your own as neccessary
+
+\title{RL Project Proposal Template}
+% TODO: add your real name and real link
+\author{Theo Retisch \\ \url{github.com/theo/adrl_project}}
+
+\begin{document}
+
+\maketitle
+\section{Motivation}
+Why do you think this is a good idea? Convince us in 3-4 sentences.
+
+\section{Related Topics}
+What does this relate to from the lecture or the literature? Mention 2-3 concepts or cite 2-3 papers that are relevant to what you want to do.
+
+\section{Idea}
+Briefly describe your idea. We do not necessarily need details at this stage, but a rough notion of what you want to accomplish and why.
+
+\begin{algorithm}[H]
+    \caption{A great RL algorithm.}
+    \label{alg:code}
+    \begin{algorithmic}
+        \Require environment $e$, algorithm $A$
+        \Return policy $\pi$
+        \While TRUE
+            \State Train $A$ on $e$
+        \EndWhile
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{equation}
+    \label{eq:pi}
+    \pi \in \Pi, \pi: \mathcal{S} \mapsto \mathcal{A}
+\end{equation}
+
+\section{Experiments}
+We want to know roughly what you are planning to show in terms of experiments. 
+
+\paragraph{Environments \& Metrics} What environments will you consider and what are you planning to measure? 
+
+\paragraph{Experimental Scope} How many experiments are you running? Include seeds, hyperparameter optimization, different environments, ablations, etc. here.
+
+\paragraph{Estimated Computational Load} How long will your experiments take and how will you run them? These do not need to be exact numbers, but we want to see that you know roughly how much time, memory and other resources you will need.
+
+\section{Timeline}
+Please tell us how long you think it will take to accomplish all parts of your project. This includes:
+\begin{itemize}
+    \item Research
+    \item Implementation
+    \item Experiments
+    \item Analysis
+    \item Reporting
+\end{itemize}
+\end{document}

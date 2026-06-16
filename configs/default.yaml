@@ -1,0 +1,67 @@
+ppo:
+  learning_rate: 3.0e-4
+  n_steps: 1024
+  batch_size: 256
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  policy: "MlpPolicy"
+
+training:
+  total_timesteps: 1_000_000
+  success_threshold: 0.7
+  window: 20
+  max_steps: 500
+  progress_threshold: 0.02   # for self_paced: min reward delta to not be "plateau"
+
+eval:
+  n_eval_episodes: 50
+  eval_freq: 50_000
+
+rnd:
+  lr: 1.0e-4
+  coef: 0.1
+
+icm:
+  lr: 1.0e-4
+  coef: 0.1
+  beta: 0.2
+
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+strategies:
+  - progressive
+  - reverse
+  - random
+  - hard_only
+  - mixed
+  - self_paced
+
+rnd_strategies:
+  - progressive_rnd
+  - random_rnd
+  - hard_only_rnd
+
+icm_strategies:
+  - progressive_icm
+
+ablation_thresholds: [0.5, 0.6, 0.7, 0.8, 0.9]
+ablation_seeds: [0, 1, 2, 3, 4]
+
+# OOD test environments (held-out during training)
+test_envs:
+  - "MiniGrid-DoorKey-5x5-v0"
+  - "MiniGrid-MultiRoom-N2-S4-v0"
+  - "MiniGrid-LavaCrossingS9N1-v0"
+  - "MiniGrid-SimpleCrossingS9N1-v0"
+  - "MiniGrid-DistShift1-v0"
+
+# Transfer learning: fine-tune on these after training
+transfer_envs:
+  - "MiniGrid-DoorKey-8x8-v0"
+  - "MiniGrid-MultiRoom-N4-S5-v0"
+transfer_finetune_steps: 200_000

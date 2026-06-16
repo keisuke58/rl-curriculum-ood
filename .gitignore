@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+results/
+*.zip
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.nav
+*.snm
+*.toc
