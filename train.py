@@ -9,6 +9,9 @@ Usage:
   python train.py --strategy self_paced --seed 0                      # self-paced
   python train.py --strategy progressive --ewc --seed 0               # EWC (exp A)
   python train.py --strategy progressive --image --seed 0             # image obs (exp B)
+  python train.py --strategy progressive_replay --seed 0              # interleaved replay
+  python train.py --strategy mixed --diverse --seed 0                 # per-tier env pools
+  python train.py --strategy mixed --obs-noise --seed 0               # obs-noise augmentation
 """
 import argparse
 import csv
@@ -22,6 +25,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
 
 from curriculum import CurriculumEnv, ENVS, SEQUENCES
+from envs.wrappers import ObsNoiseWrapper
 from rnd import RNDModule, RNDEnvWrapper
 from icm import ICMModule, ICMEnvWrapper
 from ewc import EWCCallback
@@ -74,7 +78,8 @@ class LogCallback(BaseCallback):
 
 def make_env(strategy: str, seed: int,
              use_rnd: bool = False, use_icm: bool = False,
-             use_image: bool = False):
+             use_image: bool = False, use_diverse: bool = False,
+             use_obs_noise: bool = False):
     env = CurriculumEnv(
         strategy=strategy,
         seed=seed,
@@ -83,7 +88,12 @@ def make_env(strategy: str, seed: int,
         max_steps=CFG["training"]["max_steps"],
         progress_threshold=CFG["training"].get("progress_threshold", 0.02),
         use_image=use_image,
+        replay_prob=CFG["training"].get("replay_prob", 0.2),
+        env_pool=use_diverse,
     )
+    if use_obs_noise and not use_image:
+        env = ObsNoiseWrapper(env, noise_std=CFG["training"].get("obs_noise_std", 0.05),
+                              seed=seed)
     if use_rnd:
         obs_dim = env.observation_space.shape[0]
         rnd = RNDModule(obs_dim=obs_dim, lr=CFG.get("rnd", {}).get("lr", 1e-4))
@@ -101,9 +111,14 @@ def make_env(strategy: str, seed: int,
 
 def train(strategy: str, seed: int,
           use_rnd: bool = False, use_icm: bool = False,
-          use_ewc: bool = False, use_image: bool = False):
+          use_ewc: bool = False, use_image: bool = False,
+          use_diverse: bool = False, use_obs_noise: bool = False):
     suffix = "_rnd" if use_rnd else ("_icm" if use_icm else
              ("_ewc" if use_ewc else ("_image" if use_image else "")))
+    if use_diverse:
+        suffix += "_div"
+    if use_obs_noise:
+        suffix += "_noise"
     tag = f"{strategy}{suffix}"
 
     print(f"\n{'='*50}")
@@ -115,7 +130,8 @@ def train(strategy: str, seed: int,
         print(f"  Already exists, skipping: {csv_path.name}")
         return
 
-    env = make_env(strategy, seed, use_rnd=use_rnd, use_icm=use_icm, use_image=use_image)
+    env = make_env(strategy, seed, use_rnd=use_rnd, use_icm=use_icm, use_image=use_image,
+                   use_diverse=use_diverse, use_obs_noise=use_obs_noise)
     ppo_cfg = CFG["ppo"].copy()
     policy  = ppo_cfg.pop("policy")
     if use_image:
@@ -149,12 +165,18 @@ def main():
     parser.add_argument("--icm",   action="store_true", help="Add ICM intrinsic reward")
     parser.add_argument("--ewc",   action="store_true", help="EWC regularisation (exp A)")
     parser.add_argument("--image", action="store_true", help="Raw image obs + CnnPolicy (exp B)")
+    parser.add_argument("--diverse",   action="store_true",
+                        help="Sample per-tier env variants from ENV_POOLS (diversity boost)")
+    parser.add_argument("--obs-noise", action="store_true",
+                        help="Gaussian noise on flat observations (regularizer)")
     args = parser.parse_args()
 
     if args.rnd and args.icm:
         raise ValueError("Cannot use --rnd and --icm simultaneously")
     if args.ewc and args.image:
         raise ValueError("Cannot use --ewc and --image simultaneously")
+    if args.obs_noise and args.image:
+        raise ValueError("--obs-noise only applies to flat observations, not --image")
 
     strategies = ALL_STRATEGIES if args.strategy == "all" else [args.strategy]
     seeds      = args.seeds if args.seeds else [args.seed]
@@ -163,7 +185,8 @@ def main():
         for seed in seeds:
             train(strategy, seed,
                   use_rnd=args.rnd, use_icm=args.icm,
-                  use_ewc=args.ewc, use_image=args.image)
+                  use_ewc=args.ewc, use_image=args.image,
+                  use_diverse=args.diverse, use_obs_noise=args.obs_noise)
 
 
 if __name__ == "__main__":
