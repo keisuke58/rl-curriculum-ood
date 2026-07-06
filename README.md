@@ -17,6 +17,26 @@ Keisuke Nishioka
 
 > Additional exploratory experiments (RND/ICM intrinsic motivation in `rnd.py`/`icm.py`, EWC in `ewc.py`) were run but excluded from the report to keep scope focused; RND did not improve OOD transfer in our setting.
 
+## Improvement Measures (向上施策)
+
+Three follow-up measures targeting the findings above are implemented — see
+[docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) for design rationale and the full experiment matrix:
+
+1. **Interleaved replay curriculum** (`--strategy progressive_replay`) — progressive staging with
+   probabilistic rehearsal of earlier stages, targeting catastrophic forgetting. Replay episodes
+   are excluded from the stage-advancement window.
+2. **Per-tier environment pools** (`--diverse`) — each difficulty tier samples from multiple
+   structurally distinct envs (held-out test/transfer families excluded), directly increasing the
+   training diversity that the results identify as the driver of OOD transfer.
+3. **Observation-noise regularization** (`--obs-noise`) — Gaussian noise on flat observations
+   during training to reduce overfitting to training-env-specific observation patterns.
+
+```bash
+python train.py --strategy progressive_replay --seeds 0 1 2 3 4 5 6 7 8 9
+python train.py --strategy mixed --diverse --seeds 0 1 2 3 4 5 6 7 8 9
+python evaluate.py --strategy progressive_replay --seed 0   # variants: mixed_div, mixed_noise, ...
+```
+
 ## Setup
 
 ```bash
