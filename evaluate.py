@@ -99,6 +99,7 @@ def run_eval(strategy: str, seed: int, force: bool = False):
 def main():
     all_strategies = (
         CFG["strategies"]
+        + CFG.get("variant_strategies", [])
         + CFG.get("rnd_strategies", [])
         + CFG.get("icm_strategies", [])
     )

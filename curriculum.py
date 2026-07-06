@@ -11,6 +11,18 @@ Strategies:
   mixed        : uniform sample from all 3 at all times (multi-task baseline)
   self_paced   : Easy -> Medium -> Hard, advances when learning PLATEAUS
                  (delta mean_reward over last window < progress_threshold)
+  progressive_replay : progressive staging, but each episode revisits an earlier
+                 stage with probability replay_prob (interleaved rehearsal).
+                 Targets catastrophic forgetting while keeping easy->hard ordering.
+                 Replay episodes are excluded from the advancement window so easy
+                 successes cannot trigger premature stage advancement.
+
+Env pools (env_pool=True):
+  Each difficulty tier maps to a POOL of structurally distinct MiniGrid envs and
+  every episode samples one variant from the current tier. Motivated by the
+  finding that task diversity, not ordering, drives OOD transfer. Pool variants
+  deliberately exclude the held-out test/transfer env families
+  (DoorKey, MultiRoom, *Crossing, DistShift).
 """
 import random
 import numpy as np
@@ -38,6 +50,25 @@ ENVS = {
     "hard":   "MiniGrid-KeyCorridorS3R1-v0",
 }
 
+# Diversified per-tier pools (env_pool=True). First entry = canonical ENVS env.
+# Held-out families (DoorKey, MultiRoom, LavaCrossing, SimpleCrossing, DistShift)
+# are intentionally absent so the OOD evaluation stays zero-shot.
+ENV_POOLS = {
+    "easy": [
+        "MiniGrid-Empty-8x8-v0",
+        "MiniGrid-Empty-Random-6x6-v0",
+        "MiniGrid-Empty-16x16-v0",
+    ],
+    "medium": [
+        "MiniGrid-FourRooms-v0",
+        "MiniGrid-Unlock-v0",
+    ],
+    "hard": [
+        "MiniGrid-KeyCorridorS3R1-v0",
+        "MiniGrid-KeyCorridorS3R2-v0",
+    ],
+}
+
 SEQUENCES = {
     "progressive": ["easy", "medium", "hard"],
     "reverse":     ["hard", "medium", "easy"],
@@ -45,6 +76,7 @@ SEQUENCES = {
     "hard_only":   ["hard"],
     "mixed":       ["easy", "medium", "hard"],
     "self_paced":  ["easy", "medium", "hard"],
+    "progressive_replay": ["easy", "medium", "hard"],
 }
 
 
@@ -63,6 +95,8 @@ class CurriculumEnv(gym.Env):
         max_steps: int = 500,
         progress_threshold: float = 0.02,  # for self_paced: min delta to not be "plateau"
         use_image: bool = False,           # experiment B: raw image obs for CnnPolicy
+        replay_prob: float = 0.2,          # progressive_replay: prob of revisiting an earlier stage
+        env_pool: bool = False,            # sample env variants from ENV_POOLS per tier
     ):
         assert strategy in SEQUENCES, f"Unknown strategy: {strategy}"
         self.strategy = strategy
@@ -72,6 +106,8 @@ class CurriculumEnv(gym.Env):
         self.max_steps = max_steps
         self.progress_threshold = progress_threshold
         self.use_image = use_image
+        self.replay_prob = replay_prob
+        self.env_pool = env_pool
 
         self.sequence = SEQUENCES[strategy]
         self.stage_idx = 0
@@ -79,24 +115,29 @@ class CurriculumEnv(gym.Env):
         self.reward_history = deque(maxlen=window * 2)  # for self_paced plateau detection
 
         self._ep_count = 0
+        self._rng = random.Random(seed)
 
+        pools = ENV_POOLS if env_pool else {k: [v] for k, v in ENVS.items()}
         self._envs = {}
-        for key, env_id in ENVS.items():
-            env = gym.make(env_id, max_steps=max_steps)
-            if use_image:
-                env = ImgObsWrapper(env)       # dict → image array (H,W,C)
-                env = TransposeCHWWrapper(env)  # (H,W,C) → (C,H,W) for CnnPolicy
-            else:
-                env = FlatObsWrapper(env)
-            env.reset(seed=seed)
-            self._envs[key] = env
+        for key, env_ids in pools.items():
+            self._envs[key] = []
+            for env_id in env_ids:
+                env = gym.make(env_id, max_steps=max_steps)
+                if use_image:
+                    env = ImgObsWrapper(env)       # dict → image array (H,W,C)
+                    env = TransposeCHWWrapper(env)  # (H,W,C) → (C,H,W) for CnnPolicy
+                else:
+                    env = FlatObsWrapper(env)
+                env.reset(seed=seed)
+                self._envs[key].append(env)
 
-        sample_env = self._envs["easy"]
+        sample_env = self._envs["easy"][0]
         self.observation_space = sample_env.observation_space
         self.action_space = sample_env.action_space
 
         self._current_key = self.sequence[0]
-        self._current_env = self._envs[self._current_key]
+        self._current_env = self._envs[self._current_key][0]
+        self._is_replay_episode = False
         self._episode_step = 0
 
     def _should_advance(self) -> bool:
@@ -104,7 +145,7 @@ class CurriculumEnv(gym.Env):
         if self.stage_idx >= len(self.sequence) - 1:
             return False
 
-        if self.strategy in ("progressive", "reverse"):
+        if self.strategy in ("progressive", "reverse", "progressive_replay"):
             return (
                 len(self.recent_successes) == self.window
                 and np.mean(self.recent_successes) >= self.success_threshold
@@ -131,11 +172,24 @@ class CurriculumEnv(gym.Env):
         return False
 
     def _select_env_key(self) -> str:
+        self._is_replay_episode = False
+
         if self.strategy in ("progressive", "reverse", "self_paced"):
             if self._should_advance():
                 self.stage_idx += 1
                 self.recent_successes.clear()
                 self.reward_history.clear()
+            return self.sequence[self.stage_idx]
+
+        if self.strategy == "progressive_replay":
+            # Progressive staging + interleaved rehearsal of earlier stages
+            if self._should_advance():
+                self.stage_idx += 1
+                self.recent_successes.clear()
+                self.reward_history.clear()
+            if self.stage_idx > 0 and self._rng.random() < self.replay_prob:
+                self._is_replay_episode = True
+                return self._rng.choice(self.sequence[:self.stage_idx])
             return self.sequence[self.stage_idx]
 
         if self.strategy == "random":
@@ -156,7 +210,7 @@ class CurriculumEnv(gym.Env):
 
     def reset(self, **kwargs):
         self._current_key = self._select_env_key()
-        self._current_env = self._envs[self._current_key]
+        self._current_env = self._rng.choice(self._envs[self._current_key])
         self._episode_step = 0
         self._ep_count += 1
         obs, info = self._current_env.reset()
@@ -170,16 +224,20 @@ class CurriculumEnv(gym.Env):
         done = terminated or truncated
         if done:
             success = float(terminated and reward > 0)
-            self.recent_successes.append(success)
-            self.reward_history.append(reward)
+            # Replay episodes don't count toward advancement: easy-stage successes
+            # must not push the current stage over the threshold prematurely.
+            if not self._is_replay_episode:
+                self.recent_successes.append(success)
+                self.reward_history.append(reward)
             info["success"] = success
             info["env_key"] = self._current_key
             info["stage"] = self.stage_idx
         return obs, reward, terminated, truncated, info
 
     def close(self):
-        for env in self._envs.values():
-            env.close()
+        for envs in self._envs.values():
+            for env in envs:
+                env.close()
 
     @property
     def current_stage(self) -> str:

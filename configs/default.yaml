@@ -17,6 +17,8 @@ training:
   window: 20
   max_steps: 500
   progress_threshold: 0.02   # for self_paced: min reward delta to not be "plateau"
+  replay_prob: 0.2           # for progressive_replay: prob of revisiting an earlier stage
+  obs_noise_std: 0.05        # for --obs-noise: Gaussian std on flat observations
 
 eval:
   n_eval_episodes: 50
@@ -40,6 +42,15 @@ strategies:
   - hard_only
   - mixed
   - self_paced
+  - progressive_replay
+
+# Improvement-measure variants (tags produced by train.py --diverse / --obs-noise)
+variant_strategies:
+  - progressive_replay_div
+  - progressive_div
+  - mixed_div
+  - mixed_noise
+  - progressive_replay_noise
 
 rnd_strategies:
   - progressive_rnd
