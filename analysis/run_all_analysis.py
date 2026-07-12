@@ -21,6 +21,7 @@ scripts = [
     "stats_test.py",
     "plot_ablation.py",
     "plot_transfer.py",
+    "plot_convergence.py",   # extension: RND-signal convergence detection
 ]
 
 for script in scripts:

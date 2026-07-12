@@ -50,6 +50,14 @@ class LogCallback(BaseCallback):
         self._last_log = 0
         self._rows = []
 
+    def _find_rnd(self, env):
+        """Walk the gym.Wrapper chain to find an RNDEnvWrapper, if any."""
+        while env is not None:
+            if hasattr(env, "rnd"):
+                return env.rnd
+            env = getattr(env, "env", None)
+        return None
+
     def _on_step(self) -> bool:
         if self.num_timesteps - self._last_log >= self.eval_freq:
             self._last_log = self.num_timesteps
@@ -65,14 +73,20 @@ class LogCallback(BaseCallback):
             mean_r = float(np.mean(recent)) if recent else 0.0
             std_r  = float(np.std(recent))  if recent else 0.0
 
-            self._rows.append([self.num_timesteps, mean_r, std_r, key, stage])
-            print(f"  step={self.num_timesteps:>8d}  mean_r={mean_r:.3f}  env={key}  stage={stage}")
+            # Convergence-detection signal: RND predictor loss (EMA) if RND is active,
+            # else NaN. Logged as an intrinsic proxy for "has learning stopped".
+            rnd = self._find_rnd(monitor)
+            rnd_loss = float(rnd.ema_loss) if (rnd is not None and rnd.ema_loss is not None) else float("nan")
+
+            self._rows.append([self.num_timesteps, mean_r, std_r, key, stage, rnd_loss])
+            print(f"  step={self.num_timesteps:>8d}  mean_r={mean_r:.3f}  env={key}  stage={stage}"
+                  + (f"  rnd={rnd_loss:.4f}" if rnd_loss == rnd_loss else ""))
         return True
 
     def _on_training_end(self):
         with open(self.csv_path, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["step", "mean_reward", "std_reward", "env_key", "stage"])
+            writer.writerow(["step", "mean_reward", "std_reward", "env_key", "stage", "rnd_loss"])
             writer.writerows(self._rows)
 
 

@@ -41,6 +41,26 @@ Each condition runs PPO (Stable-Baselines3, `MlpPolicy` on flattened observation
 
 > Additional exploratory experiments (RND/ICM intrinsic motivation in `rnd.py`/`icm.py`, EWC in `ewc.py`) were run but excluded from the report to keep scope focused; RND did not improve OOD transfer in our setting.
 
+### Extension: convergence detection via the RND signal
+
+Although RND did not help OOD transfer, its predictor error is repurposed as an
+**intrinsic convergence signal**: as the policy converges and revisits the same
+states, the error falls and plateaus. `train.py --rnd` now logs this signal
+(`rnd_loss` column), and `analysis/plot_convergence.py` detects the first
+sustained plateau and compares it against the reward-curve plateau — quantifying
+how much of the fixed step budget an intrinsic early-stop would save. This
+addresses the "measuring training progress / detecting convergence" direction
+while staying inside the existing MiniGrid+RND setup.
+
+```bash
+# 1. Re-run RND conditions so the new `rnd_loss` signal is logged
+for s in progressive random hard_only; do
+  python train.py --strategy $s --seeds 0 1 2 3 4 --rnd
+done
+# 2. Detect plateaus + budget saved, write figures/convergence_detection.png
+python analysis/plot_convergence.py
+```
+
 ## Improvement Measures (向上施策)
 
 Three follow-up measures targeting the findings above are implemented — see
@@ -100,6 +120,7 @@ analysis/
   plot_ablation.py
   plot_stage_transitions.py
   plot_stage_heatmap.py
+  plot_convergence.py  # Extension: RND-signal convergence detection vs reward plateau
   stats_test.py        # Significance tests (Kruskal-Wallis + post-hoc Mann-Whitney U)
   run_all_analysis.py  # Run all analysis scripts at once
   style.py             # Shared matplotlib style
