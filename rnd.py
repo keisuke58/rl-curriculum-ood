@@ -47,6 +47,15 @@ class RNDModule:
         self._reward_running_var = 1.0
         self._reward_count = 0
 
+        # --- convergence-detection extension ---
+        # Predictor loss is a proxy for "how novel are the states the agent still
+        # visits". As the policy converges and revisits the same states, the
+        # predictor error on them drops and stabilises. We expose the most recent
+        # loss plus an EMA so a training callback can log it cheaply.
+        self.last_loss: float = float("nan")
+        self.ema_loss: float | None = None
+        self.ema_decay: float = 0.99
+
     def _to_tensor(self, obs: np.ndarray) -> torch.Tensor:
         if isinstance(obs, np.ndarray):
             obs = torch.FloatTensor(obs)
@@ -74,7 +83,14 @@ class RNDModule:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        return float(loss)
+
+        loss_val = float(loss)
+        self.last_loss = loss_val
+        self.ema_loss = (
+            loss_val if self.ema_loss is None
+            else self.ema_decay * self.ema_loss + (1 - self.ema_decay) * loss_val
+        )
+        return loss_val
 
 
 class RNDEnvWrapper(gym.Wrapper):

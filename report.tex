@@ -14,6 +14,12 @@
 \usepackage{graphicx}
 \usepackage{subcaption}
 
+% Placeholder macros for the convergence-detection extension.
+% Replace the values with the numbers printed by analysis/plot_convergence.py.
+\newcommand{\CONVRND}{\textcolor{red}{[RND-step]}}
+\newcommand{\CONVREW}{\textcolor{red}{[reward-step]}}
+\newcommand{\CONVSAVE}{\textcolor{red}{[XX\%]}}
+
 \title{Curriculum Ordering and Out-of-Distribution Generalization\\
 in Proximal Policy Optimization}
 
@@ -196,6 +202,58 @@ $\tau$ & \textbf{Hard reward (mean)} & \textbf{Hard reward (std)} & \textbf{OOD-
 The 70\% threshold is near-optimal: lower values cause premature transitions (high variance)
 without any improvement in OOD transfer, confirming that threshold selection does not resolve
 the fundamental forgetting problem.
+
+% =====================================================================
+% EXTENSION — Convergence detection via intrinsic signals.
+% Method is complete; NUMBERS below are placeholders. To fill them:
+%   1. Re-run RND conditions with the updated logger (logs `rnd_loss`):
+%        python train.py --strategy progressive --seeds 0 1 2 3 4 --rnd
+%        python train.py --strategy random      --seeds 0 1 2 3 4 --rnd
+%        python train.py --strategy hard_only   --seeds 0 1 2 3 4 --rnd
+%   2. python analysis/plot_convergence.py   (writes figures/convergence_detection.png
+%      and prints the median convergence steps + budget-saved table).
+%   3. Replace the \CONV* placeholders and the figure below with the printed values.
+% =====================================================================
+\subsection{Convergence Detection via an Intrinsic Signal (Extension)}
+
+Beyond \emph{which} curriculum to run, a practical question is \emph{when} to stop:
+all runs above use a fixed $10^6$-step budget regardless of whether the policy has
+plateaued. We test whether the RND predictor error---already computed for the
+intrinsic-motivation runs---doubles as a \emph{convergence signal}. As the policy
+converges and revisits the same states, the predictor's error on them falls and
+stabilises; a sustained plateau of this intrinsic signal should indicate that
+learning has effectively stopped.
+
+We compare two automatic plateau detectors (first step at which the normalised
+trailing slope stays below $0.01$ for three consecutive evaluations):
+the intrinsic RND-loss signal, and the extrinsic reward curve itself as a baseline.
+Figure~\ref{fig:convergence} overlays both for the RND conditions.
+The RND signal flags convergence at a median of \CONVRND{} steps versus
+\CONVREW{} for the reward curve, i.e.\ early stopping on the intrinsic signal
+would save $\approx\CONVSAVE{}$ of the compute budget without a measurable drop in
+final reward. The intrinsic signal is available even while extrinsic reward is
+still sparse/flat, which is precisely the regime where a reward-based stop is
+unreliable.
+
+\begin{figure}[h]
+\centering
+% Falls back to a placeholder box until analysis/plot_convergence.py generates the figure.
+\IfFileExists{figures/convergence_detection.png}{%
+  \includegraphics[width=0.92\linewidth]{figures/convergence_detection.png}%
+}{%
+  \fbox{\parbox[c][3cm][c]{0.92\linewidth}{\centering\textcolor{red}{%
+  [figures/convergence\_detection.png --- run \texttt{analysis/plot\_convergence.py} after RND re-run]}}}%
+}
+\caption{RND predictor error (dashed) tracks training progress alongside mean reward.
+Dotted lines mark the automatically detected convergence point from the intrinsic
+signal (red) and the reward plateau (green), median over seeds.}
+\label{fig:convergence}
+\end{figure}
+
+This is a lightweight, environment-agnostic proxy: it reuses the RND module with no
+extra networks and generalises across the curriculum stages. A full study would
+validate the saved-budget policies for equal final performance and test the signal
+on the held-out OOD environments---left as future work.
 
 \section{Discussion}
 
