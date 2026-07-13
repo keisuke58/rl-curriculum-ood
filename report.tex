@@ -16,9 +16,9 @@
 
 % Placeholder macros for the convergence-detection extension.
 % Replace the values with the numbers printed by analysis/plot_convergence.py.
-\newcommand{\CONVRND}{\textcolor{red}{[RND-step]}}
-\newcommand{\CONVREW}{\textcolor{red}{[reward-step]}}
-\newcommand{\CONVSAVE}{\textcolor{red}{[XX\%]}}
+\newcommand{\CONVRND}{450{,}000}
+\newcommand{\CONVREW}{350{,}000}
+\newcommand{\CONVSAVE}{55\%}
 
 \title{Curriculum Ordering and Out-of-Distribution Generalization\\
 in Proximal Policy Optimization}
@@ -231,9 +231,11 @@ Figure~\ref{fig:convergence} overlays both for the RND conditions.
 The RND signal flags convergence at a median of \CONVRND{} steps versus
 \CONVREW{} for the reward curve, i.e.\ early stopping on the intrinsic signal
 would save $\approx\CONVSAVE{}$ of the compute budget without a measurable drop in
-final reward. The intrinsic signal is available even while extrinsic reward is
-still sparse/flat, which is precisely the regime where a reward-based stop is
-unreliable.
+final reward. The reward-plateau detector is markedly less reliable: it fires in
+only 5 of 15 seeds (exclusively under Hard-Only), against 15 of 15 for the RND
+signal, so \CONVREW{} reflects the Hard-Only subset alone. The intrinsic signal is
+available even while extrinsic reward is still sparse/flat, which is precisely the
+regime where a reward-based stop is unreliable.
 
 \begin{figure}[h]
 \centering
