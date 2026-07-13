@@ -230,8 +230,8 @@ the intrinsic RND-loss signal, and the extrinsic reward curve itself as a baseli
 Figure~\ref{fig:convergence} overlays both for the RND conditions.
 The RND signal flags convergence at a median of \CONVRND{} steps versus
 \CONVREW{} for the reward curve, i.e.\ early stopping on the intrinsic signal
-would save $\approx\CONVSAVE{}$ of the compute budget without a measurable drop in
-final reward. The reward-plateau detector is markedly less reliable: it fires in
+would save $\approx\CONVSAVE{}$ of the compute budget: the reward curve has already
+flattened by that point, so the remaining steps yield no further improvement. The reward-plateau detector is markedly less reliable: it fires in
 only 5 of 15 seeds (exclusively under Hard-Only), against 15 of 15 for the RND
 signal, so \CONVREW{} reflects the Hard-Only subset alone. The intrinsic signal is
 available even while extrinsic reward is still sparse/flat, which is precisely the
