@@ -76,7 +76,9 @@ PPO~\citep{schulman-arxiv17} via stable-baselines3, identical hyperparameters ac
 (lr $=3\!\times\!10^{-4}$, $n_\text{steps}=1024$, $\gamma=0.99$, clip $\epsilon=0.2$, $10^6$ steps, $N=10$ seeds).
 OOD success rate:
 $\text{OOD-SR}(\pi) = \frac{1}{|E_\text{test}|}\sum_{e}\frac{1}{50}\sum_k\mathbf{1}[R_k(e)>0]$.
-Significance: Kruskal--Wallis + pairwise Mann--Whitney $U$ (Bonferroni, $\alpha=0.05$).
+Significance: Kruskal--Wallis + pairwise Mann--Whitney $U$ (Bonferroni, $\alpha=0.05$);
+for aggregate metrics with stratified-bootstrap confidence intervals we also cross-check
+against the \texttt{rliable} protocol~\citep{agarwal-neurips21}.
 
 \section{Experiments}
 
@@ -287,6 +289,16 @@ obstacle avoidance---that are shared structural features of the held-out environ
 Sequential curriculum destroys these shared features by overwriting earlier-stage representations,
 leaving a narrow specialist with no transferable skills.
 
+\paragraph{Toward adaptive difficulty mixing.}
+Our finding---that sequential ordering forgets while concurrent multi-task training does
+not---points to a middle ground the discrete conditions here do not cover: rather than a
+fixed schedule, the curriculum can \emph{decide the mixture of difficulties} online, keeping
+each task represented by a small portion so no stage is overwritten. Distributionally robust
+multi-task RL via adaptive task sampling~\citep{robust-multitask-arxiv26} formalizes exactly
+this---up-weighting the currently hardest task while retaining the others---and is a natural
+next step that should combine the controllability of a curriculum with the anti-forgetting
+stability of multi-task learning.
+
 \paragraph{Limitations and future work.}
 We evaluate at $10^6$ steps with a single algorithm (PPO) and a fixed environment set.
 Automatic curriculum generation~\citep{portelas-ijcai20} adapts difficulty dynamically
@@ -294,6 +306,10 @@ and could in principle avoid forgetting while preserving diversity.
 Elastic Weight Consolidation~\citep{kirkpatrick2017overcoming} directly regularizes against
 stage-transition forgetting and is the most principled mitigation.
 Domain randomization and procedural generation offer a path to principled OOD transfer at scale.
+Finally, our analysis explains \emph{that} diversity transfers via the generalization gap
+(Fig.~\ref{fig:gap}); a direct probe of the learned \emph{feature representations}
+(e.g.\ representation similarity across conditions, or linear-probe transfer of intermediate
+features) would explain \emph{why} at the representational level and is left to future work.
 
 % Everything from this point on does not count towards the page limit
 \newpage
