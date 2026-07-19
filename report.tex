@@ -298,6 +298,10 @@ adaptive task sampling (DRATS)~\citep{robust-multitask-arxiv26} formalizes exact
 minimax objective that prioritizes the tasks furthest from being solved while retaining the
 others---a natural next step that should combine the controllability of a curriculum with the
 anti-forgetting stability of multi-task learning.
+Notably, our worst condition, Progressive, is an instance of the \emph{easy-first} sampling
+that DRATS argues against---over-allocating interactions to easy stages that need them least---while
+our best condition, Mixed, coincides with its uniform-sampling baseline; our results thus offer
+empirical support for its motivation from the curriculum-\emph{ordering} side.
 
 \paragraph{Limitations and future work.}
 We evaluate at $10^6$ steps with a single algorithm (PPO) and a fixed environment set.
