@@ -294,10 +294,10 @@ Our finding---that sequential ordering forgets while concurrent multi-task train
 not---points to a middle ground the discrete conditions here do not cover: rather than a
 fixed schedule, the curriculum can \emph{decide the mixture of difficulties} online, keeping
 each task represented by a small portion so no stage is overwritten. Distributionally robust
-multi-task RL via adaptive task sampling~\citep{robust-multitask-arxiv26} formalizes exactly
-this---up-weighting the currently hardest task while retaining the others---and is a natural
-next step that should combine the controllability of a curriculum with the anti-forgetting
-stability of multi-task learning.
+adaptive task sampling (DRATS)~\citep{robust-multitask-arxiv26} formalizes exactly this via a
+minimax objective that prioritizes the tasks furthest from being solved while retaining the
+others---a natural next step that should combine the controllability of a curriculum with the
+anti-forgetting stability of multi-task learning.
 
 \paragraph{Limitations and future work.}
 We evaluate at $10^6$ steps with a single algorithm (PPO) and a fixed environment set.
